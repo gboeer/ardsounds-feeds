@@ -6,11 +6,17 @@ from email.utils import format_datetime
 from typing import Any, Callable
 from xml.etree import ElementTree as ET
 
+from ardaudiothek_api import AudioMissingError
+
 ET.register_namespace("atom", "http://www.w3.org/2005/Atom")
 ET.register_namespace("media", "http://search.yahoo.com/mrss/")
 ET.register_namespace("itunes", "http://www.itunes.com/dtds/podcast-1.0.dtd")
 
 FILE_LENGTH_WORKERS = 8
+
+
+class NoPlayableEpisodesError(ValueError):
+    """Raised when a show has episodes, but every one of their audio files is gone."""
 
 
 def _format_rss_pubdate(iso_dt: str) -> str:
@@ -31,17 +37,28 @@ def _episode_description(node: dict[str, Any]) -> str:
 def _fetch_file_lengths(
     nodes: list[dict[str, Any]],
     get_file_length: Callable[[str], int | None],
-) -> dict[str, int | None]:
-    """Look up enclosure sizes concurrently; the ARD API does not provide them."""
+) -> tuple[dict[str, int | None], set[str]]:
+    """Look up enclosure sizes concurrently; the ARD API does not provide them.
+
+    Returns the sizes by audio URL and the set of URLs whose file no longer exists.
+    """
     urls = {
         audios[0]["url"]
         for node in nodes
         if (audios := node.get("audios")) and audios[0].get("url")
     }
-    if not urls:
-        return {}
+    lengths: dict[str, int | None] = {}
+    missing: set[str] = set()
+
+    def lookup(url: str) -> None:
+        try:
+            lengths[url] = get_file_length(url)
+        except AudioMissingError:
+            missing.add(url)
+
     with ThreadPoolExecutor(max_workers=FILE_LENGTH_WORKERS) as pool:
-        return dict(zip(urls, pool.map(get_file_length, urls)))
+        list(pool.map(lookup, urls))
+    return lengths, missing
 
 
 def read_enclosure_lengths(xml_text: str) -> dict[str, int]:
@@ -74,7 +91,7 @@ def build_rss_xml(
 
     image = ET.SubElement(channel, "image")
     ET.SubElement(image, "url").text = _replace_width(
-        show.get("image", {}).get("url1X1", "")
+        (show.get("image") or {}).get("url1X1") or ""
     )
     ET.SubElement(image, "title").text = show.get("title", "")
     ET.SubElement(
@@ -97,15 +114,20 @@ def build_rss_xml(
         {"href": self_link, "rel": "self", "type": "application/rss+xml"},
     )
 
-    nodes = show.get("items", {}).get("nodes", [])
-    file_lengths = _fetch_file_lengths(nodes, get_file_length)
+    nodes = (show.get("items") or {}).get("nodes") or []
+    file_lengths, missing_audio = _fetch_file_lengths(nodes, get_file_length)
 
+    playable = 0
     for node in nodes:
-        item = ET.SubElement(channel, "item")
         audios = node.get("audios") or []
         primary_audio = audios[0] if audios else {}
 
         audio_url = primary_audio.get("url") or ""
+        # ARD still lists some episodes whose audio is gone; apps can't play those.
+        if not audio_url or audio_url in missing_audio:
+            continue
+        playable += 1
+        item = ET.SubElement(channel, "item")
         download_url = primary_audio.get("downloadUrl") or ""
         mime_type = primary_audio.get("mimeType") or "audio/mpeg"
         duration = int(node.get("duration") or 0)
@@ -138,14 +160,17 @@ def build_rss_xml(
             item, "{http://www.itunes.com/dtds/podcast-1.0.dtd}duration"
         ).text = str(duration)
 
-        item_image_url = _replace_width(node.get("image", {}).get("url1X1", ""))
+        item_image_url = _replace_width((node.get("image") or {}).get("url1X1") or "")
         ET.SubElement(
             item,
             "{http://www.itunes.com/dtds/podcast-1.0.dtd}image",
             {"href": item_image_url},
         )
 
-    # Pretty-print so daily diffs on the gh-pages branch stay readable.
+    if nodes and not playable:
+        raise NoPlayableEpisodesError("every episode's audio file is missing")
+
+    # Pretty-print so the feeds are readable and diff line by line.
     ET.indent(rss)
     xml = ET.tostring(rss, encoding="utf-8", xml_declaration=False)
     return xml.decode("utf-8")

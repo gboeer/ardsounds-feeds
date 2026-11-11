@@ -19,6 +19,8 @@ concurrency:
 jobs:
   fetch-and-publish:
     runs-on: ubuntu-latest
+    # A full run takes minutes (much longer only on an empty cache); stop if ARD hangs.
+    timeout-minutes: 60
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

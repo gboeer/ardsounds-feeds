@@ -10,6 +10,7 @@ Feeds are published via GitHub Pages.
 
 - Landing page with feed search: https://gboeer.github.io/podcast_feed/
 - Feed URLs: `https://gboeer.github.io/podcast_feed/feeds/<show_id>.xml`
+- OPML of all feeds: `https://gboeer.github.io/podcast_feed/opml/all.opml`
 
 For a user/org pages repo (`<owner>.github.io`), the URL pattern is:
 - Landing page: `https://<owner>.github.io/`
@@ -20,9 +21,9 @@ Here is a list with all available Podcasts: https://gist.github.com/gboeer/24290
 ## Publishing via GitHub Actions
 
 The workflow [.github/workflows/fetch-feeds.yml](.github/workflows/fetch-feeds.yml):
-- loads configured podcasts from `podcasts.json`
+- discovers all ARDSounds shows with at least one episode (minus exclusions in `podcasts.json`)
 - generates XML files in `feeds/`
-- builds a landing page (`index.html`) in `public/`
+- builds a landing page (`index.html`) grouped by station, plus OPML files (all podcasts and one per station) in `public/`
 - publishes everything directly to GitHub Pages (no separate branch)
 
 One-time GitHub setting:
@@ -61,10 +62,25 @@ http://localhost:8000/?show=8e6d4d6fa453e7f7&latest=10
 
 ### 3. Generate multiple feeds in batch
 
-`podcasts.json` defines which feeds are generated:
+By default, a feed is generated for every show ARDSounds lists. `podcasts.json` holds the settings:
+
+```json
+{
+  "default_latest": 100,
+  "exclude": ["<show_id>"],
+  "shows": [
+    { "show_id": "8e6d4d6fa453e7f7", "name": "Kalk & Welk", "latest": 20 }
+  ]
+}
+```
+
+- `default_latest`: number of newest episodes per feed
+- `exclude`: shows that should not get a feed
+- `shows`: per-show settings; `name` and `latest` are optional, `"latest": null` means all episodes
 
 ```bash
-python3 fetch_feeds.py
+python3 fetch_feeds.py                # all shows
+python3 fetch_feeds.py --listed-only  # only the shows listed under "shows"
 ```
 
 With custom atom:self base URL:

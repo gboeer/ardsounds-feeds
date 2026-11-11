@@ -10,6 +10,8 @@
 
 * { box-sizing: border-box; }
 
+[hidden] { display: none !important; }
+
 body {
   margin: 0;
   font-family: "Segoe UI", Helvetica, Arial, sans-serif;
@@ -35,6 +37,8 @@ p {
   line-height: 1.5;
 }
 
+p.small { font-size: 0.9rem; }
+
 .controls {
   display: grid;
   gap: 8px;
@@ -55,10 +59,46 @@ input[type="search"] {
   font-size: 0.95rem;
 }
 
-ul {
+.station {
+  margin-top: 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.station:first-of-type { margin-top: 24px; }
+
+.station > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.station-count {
+  flex: 0 0 auto;
+  min-width: 2.4em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--muted);
+  font-size: 0.85rem;
+  font-weight: normal;
+  text-align: center;
+}
+
+.station-opml {
+  margin: 0 16px 8px;
+  font-size: 0.85rem;
+}
+
+.station ul {
   list-style: none;
-  padding: 0;
-  margin: 24px 0;
+  padding: 0 12px 4px;
+  margin: 0;
 }
 
 li {
@@ -69,10 +109,16 @@ li {
   margin-bottom: 12px;
 }
 
-.source-link {
+.show-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: 10px;
+}
+
+.show-links {
   font-size: 0.8rem;
   color: var(--muted);
-  margin-left: 6px;
 }
 
 .feed-link-row {

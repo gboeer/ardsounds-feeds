@@ -10,6 +10,7 @@ Die Feeds werden über GitHub Pages veröffentlicht.
 
 - Landing Page mit Feed-Suche: https://gboeer.github.io/podcast_feed/
 - Feed-URLs: `https://gboeer.github.io/podcast_feed/feeds/<show_id>.xml`
+- OPML aller Feeds: `https://gboeer.github.io/podcast_feed/opml/all.opml`
 
 Für ein User/Org-Pages-Repo (`<owner>.github.io`) ist das Schema:
 - Landing Page: `https://<owner>.github.io/`
@@ -20,9 +21,9 @@ Hier ist eine Liste mit allen verfügbaren Podcasts: https://gist.github.com/gbo
 ## Veröffentlichung per GitHub Actions
 
 Der Workflow [.github/workflows/fetch-feeds.yml](.github/workflows/fetch-feeds.yml):
-- lädt die konfigurierten Podcasts aus `podcasts.json`
+- ermittelt alle Sendungen auf ARDSounds mit mindestens einer Folge (abzüglich der Ausschlüsse in `podcasts.json`)
 - erzeugt XML-Dateien in `feeds/`
-- erzeugt eine Landing Page (`index.html`) in `public/`
+- erzeugt eine Landing Page (`index.html`), gruppiert nach Sendern, sowie OPML-Dateien (alle Podcasts und je Sender) in `public/`
 - veröffentlicht alles direkt auf GitHub Pages (ohne eigenen Branch)
 
 Einmalige GitHub-Einstellung:
@@ -61,10 +62,25 @@ http://localhost:8000/?show=8e6d4d6fa453e7f7&latest=10
 
 ### 3. Mehrere Feeds auf einmal erzeugen
 
-Die Datei `podcasts.json` enthält die Liste der zu erzeugenden Feeds:
+Standardmäßig wird für jede Sendung auf ARDSounds ein Feed erzeugt. `podcasts.json` enthält die Einstellungen:
+
+```json
+{
+  "default_latest": 100,
+  "exclude": ["<show_id>"],
+  "shows": [
+    { "show_id": "8e6d4d6fa453e7f7", "name": "Kalk & Welk", "latest": 20 }
+  ]
+}
+```
+
+- `default_latest`: Anzahl der neuesten Folgen pro Feed
+- `exclude`: Sendungen, für die kein Feed erzeugt werden soll
+- `shows`: Einstellungen pro Sendung; `name` und `latest` sind optional, `"latest": null` bedeutet alle Folgen
 
 ```bash
-python3 fetch_feeds.py
+python3 fetch_feeds.py                # alle Sendungen
+python3 fetch_feeds.py --listed-only  # nur die unter "shows" eingetragenen Sendungen
 ```
 
 Mit eigener Basis-URL für atom:self:
